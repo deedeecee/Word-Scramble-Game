@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Word Scramble Game</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: 'Comic Sans MS', cursive, sans-serif; /* More playful font */
+            background-color: #f0f4f8; /* Light blue background */
+            color: #333;
+            text-align: center;
+            padding: 50px;
+            background-image: url('https://example.com/background-pattern.png'); /* Add a fun background pattern */
+            background-size: cover;
+        }
+
+        h1 {
+            color: #ff5733; /* Vibrant color for the title */
+            font-size: 3rem; /* Increased font size */
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2); /* Text shadow for a 3D effect */
+        }
+
+        .game-container {
+            display: inline-block;
+            background-color: #ffffff; /* White background for game area */
+            border-radius: 15px; /* Rounded corners */
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2); /* Stronger shadow */
+            padding: 40px;
+            width: 350px; /* Slightly wider container */
+            transition: transform 0.2s; /* Transition effect on hover */
+        }
+
+        .game-container:hover {
+            transform: scale(1.02); /* Scale up slightly on hover */
+        }
+
+        #scrambledWord {
+            font-size: 2rem; /* Increased font size for visibility */
+            font-weight: bold;
+            color: #3498db; /* Cool blue color for the scrambled word */
+            margin: 20px 0; /* Added margin for spacing */
+            border: 2px dashed #3498db; /* Dashed border */
+            padding: 10px; /* Added padding for spacing */
+            border-radius: 8px; /* Rounded corners for the border */
+            transition: transform 0.3s ease, color 0.3s ease; /* Smooth transition */
+        }
+
+        #scrambledWord:hover {
+            transform: scale(1.1) rotate(5deg); /* Scale and rotate on hover */
+            color: #e74c3c; /* Change color on hover */
+        }
+
+        input[type="text"] {
+            font-size: 1.1rem; /* Slightly larger font size for better readability */
+            padding: 10px; /* Increased padding for comfort */
+            border: 2px solid #3498db; /* Blue border */
+            border-radius: 5px; /* Rounded corners */
+            width: calc(100% - 24px); /* Full width minus padding */
+            transition: border-color 0.3s, box-shadow 0.3s; /* Smooth transition */
+            outline: none; /* Remove default outline */
+        }
+
+        input[type="text"]:hover {
+            border-color: #2980b9; /* Darker blue on hover */
+        }
+
+        input[type="text"]:focus {
+            border-color: #ff5733; /* Change border color on focus */
+            box-shadow: 0 0 5px rgba(255, 87, 51, 0.5); /* Glow effect */
+        }
+
+        #result.correct {
+            color: #27ae60; /* Green for correct answer */
+            font-size: 1.5rem; /* Increased font size for visibility */
+            margin-top: 15px;
+            transition: opacity 0.5s; /* Smooth fade in effect */
+            opacity: 1;
+        }
+
+        #result.incorrect {
+            color: #e74c3c; /* Red for incorrect answer */
+            font-size: 1.5rem; /* Increased font size for visibility */
+            margin-top: 15px;
+            transition: opacity 0.5s; /* Smooth fade in effect */
+            opacity: 1;
+        }
+
+        .hint {
+            margin-top: 20px; /* Added margin for spacing */
+            font-size: 1.2rem; /* Increased font size for visibility */
+            color: #e67e22; /* Color for hints */
+        }
+
+        button {
+            background-color: #ff5733; /* Bright color for buttons */
+            color: white;
+            border: none;
+            padding: 12px 25px; /* Increased padding for better touch area */
+            font-size: 1.1rem; /* Slightly larger text */
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s, transform 0.2s; /* Smooth transitions */
+        }
+
+        button:hover {
+            background-color: #c0392b; /* Darker red on hover */
+            transform: translateY(-2px); /* Lift effect on hover */
+        }
+
+        button:active {
+            transform: translateY(1px); /* Press effect */
+        }
+
+        #result {
+            margin-top: 15px;
+            font-weight: bold;
+        }
+
+        @media (max-width: 600px) {
+            .game-container {
+                width: 90%; /* Responsive design for smaller screens */
+            }
+
+            h1 {
+                font-size: 2.5rem; /* Responsive title size */
+            }
+        }
+    </style>
+    <script>
+        let incorrectAttempts = 0;
+
+        async function fetchWord() {
+            const response = await fetch('/api/word-scramble/random');
+            const word = await response.json();
+            document.getElementById('scrambledWord').innerText = word.scrambledWord;
+            document.getElementById('originalWord').value = word.originalWord;
+            incorrectAttempts = 0;  // Reset attempts for each new word
+            document.getElementById('hint').innerText = '';
+            document.getElementById('result').innerText = '';
+            document.getElementById('guess').value = '';  // Clear input field
+        }
+
+        async function checkGuess() {
+            const guess = document.getElementById('guess').value;
+            const originalWord = document.getElementById('originalWord').value;
+
+            const response = await fetch(`/api/word-scramble/check?originalWord=${originalWord}&guess=${guess}`, {
+                method: 'POST'
+            });
+
+            const result = await response.text();
+            const resultElement = document.getElementById('result');
+
+            if (result === 'true') {
+                resultElement.innerText = 'Correct!';
+                resultElement.className = 'correct';
+                incorrectAttempts = 0;  // Reset attempts on success
+            } else {
+                resultElement.innerText = 'Incorrect!';
+                resultElement.className = 'incorrect';
+                incorrectAttempts++;
+
+                if (incorrectAttempts >= 3) {
+                    // Show the correct word after 3 incorrect attempts
+                    await showHintOrSolution(originalWord);
+                } else {
+                    // Show a partial hint
+                    await showHintOrSolution(originalWord);
+                }
+            }
+        }
+
+        async function showHintOrSolution(originalWord) {
+            const response = await fetch(`/api/word-scramble/hint?originalWord=${originalWord}&attempts=${incorrectAttempts}`);
+            const hint = await response.text();
+
+            if (incorrectAttempts >= 3) {
+                document.getElementById('hint').innerText = `The correct word is: ${hint}`;
+            } else {
+                document.getElementById('hint').innerText = `Hint: ${hint}`;
+            }
+        }
+
+        function resetGame() {
+            fetchWord();  // Fetch a new word to start the game again
+        }
+    </script>
+</head>
+<body onload="fetchWord()">
+<h1>Word Scramble Game</h1>
+<div class="game-container">
+    <p>Scrambled Word: <span id="scrambledWord"></span></p>
+    <input type="hidden" id="originalWord">
+    <p><input type="text" id="guess" placeholder="Enter your guess"></p>
+    <button onclick="checkGuess()">Submit</button>
+    <p id="result"></p>
+    <p class="hint" id="hint"></p>
+    <button onclick="resetGame()">Play Again</button>
+</div>
+</body>
+</html>
